@@ -87,7 +87,7 @@ function syncBookmarks(key, pop) {
   if (currentRoute?.name === 'bookmark') renderBookmarks();
 }
 const getRecent = () => store.get(K.recent, []);
-const comicKey = r => keyOf(r.slug) || keyOf(r.chapterSlug);
+const comicKey = r => keyOf(r.slug) || r.mk || keyOf(r.chapterSlug);
 function recentComics() {
   const seen = new Set();
   return getRecent().filter(r => { const k = comicKey(r); if (seen.has(k)) return false; seen.add(k); return true; });
@@ -96,10 +96,12 @@ function saveRecent(chapter, detail) {
   try {
     const list = getRecent();
     const rec = {
-      title: detail?.title || chapter.title || 'Komik', slug: detail?.slug || '', thumbnail: detail?.thumbnail || '',
+      title: detail?.title || chapter.title || 'Komik', slug: detail?.slug || keyOf(chapter.manga_url || ''), mk: keyOf(chapter.manga_url || ''), thumbnail: detail?.thumbnail || '',
       chapterSlug: chapter.slug, chapterTitle: chapter.title || 'Lanjutkan membaca', time: Date.now()
     };
-    const existed = list.some(r => keyOf(r.chapterSlug) === keyOf(rec.chapterSlug));
+    const old = list.find(r => keyOf(r.chapterSlug) === keyOf(rec.chapterSlug));
+    if (old && !detail) { rec.title = old.title || rec.title; rec.thumbnail = old.thumbnail || rec.thumbnail; }
+    const existed = !!old;
     store.set(K.recent, [rec, ...list.filter(r => keyOf(r.chapterSlug) !== keyOf(rec.chapterSlug))].slice(0, 60));
     if (!existed) { settings.read = (settings.read || 0) + 1; saveSettings(); }
   } catch {  }
@@ -261,7 +263,7 @@ const genresReady = api('/genres').then(d => { genres = d.genres || []; return g
 const genreChips = (list = genres, cls = '') => list.map(g => `<a class="chip ${cls}" href="#genre/${slugPath(g)}">${esc(labelize(g))}</a>`).join('');
 
 const SIDE = new Set(['latest', 'popular', 'type', 'genre', 'search', 'kategori', 'bookmark', 'riwayat', 'profil', 'bantuan', 'tentang']);
-let currentRoute = null, lastRouteKey = '', token = 0, cleanup = null;
+let currentRoute = null, lastRouteKey = '', token = 0, cleanup = null, chapterFromDetail = false;
 
 function routeInfo() {
   const raw = (location.hash || '#home').replace(/^#/, '');
@@ -304,6 +306,8 @@ async function renderRoute(force = false) {
   const route = routeInfo();
   if (!force && route.key === lastRouteKey) return;
   lastRouteKey = route.key;
+  if (route.name === 'chapter') chapterFromDetail = currentRoute?.name === 'detail' || (currentRoute?.name === 'chapter' && chapterFromDetail);
+  else chapterFromDetail = false;
   currentRoute = route;
   token++;
   cleanup?.(); cleanup = null;
@@ -488,6 +492,7 @@ async function renderDetail(route) {
 const reader = { detailSlug: '', mangaUrl: '' };
 async function renderChapter(route) {
   const t = token;
+  reader.detailSlug = ''; reader.mangaUrl = '';
   setContent(`<div class="reader-bar"><span class="icon-btn"></span><div class="reader-title"><strong>Membuka halaman baca...</strong></div></div><div class="stage">${Array.from({ length: 3 }, () => '<div class="sk" style="height:70vh;margin-bottom:6px;border-radius:0"></div>').join('')}</div>`);
   const chapter = await api(`/chapter?slug=${encodeURIComponent(route.slug)}`);
   if (t !== token) return;
@@ -495,14 +500,14 @@ async function renderChapter(route) {
   reader.mangaUrl = chapter.manga_url || '';
   reader.detailSlug = reader.mangaUrl ? keyOf(reader.mangaUrl) : '';
   const prev = chapter.prev_chapter_url, next = chapter.next_chapter_url;
-  const prevBtn = prev ? `<a class="btn" href="#chapter/${slugPath(prev)}">${ic('chev-l')} Sebelumnya</a>` : `<span class="btn off">${ic('chev-l')} Sebelumnya</span>`;
-  const nextBtn = next ? `<a class="btn primary" href="#chapter/${slugPath(next)}">Berikutnya ${ic('chev-r')}</a>` : `<span class="btn primary off">Berikutnya ${ic('chev-r')}</span>`;
+  const prevBtn = prev ? `<a class="btn" data-replace href="#chapter/${slugPath(prev)}">${ic('chev-l')} Sebelumnya</a>` : `<span class="btn off">${ic('chev-l')} Sebelumnya</span>`;
+  const nextBtn = next ? `<a class="btn primary" data-replace href="#chapter/${slugPath(next)}">Berikutnya ${ic('chev-r')}</a>` : `<span class="btn primary off">Berikutnya ${ic('chev-r')}</span>`;
   setContent(`<div class="reader-bar">
       <button class="icon-btn" data-act="reader-back" aria-label="Kembali">${ic('arrow-l')}</button>
       <div class="reader-title"><strong id="r-comic">${esc(chapter.title || 'Baca komik')}</strong><small id="r-sub">${images.length} halaman</small></div>
       <span class="counter" id="r-count" aria-live="off">1 / ${images.length || 1}</span>
-      ${prev ? `<a class="icon-btn" href="#chapter/${slugPath(prev)}" aria-label="Chapter sebelumnya">${ic('chev-l')}</a>` : ''}
-      ${next ? `<a class="icon-btn" href="#chapter/${slugPath(next)}" aria-label="Chapter berikutnya">${ic('chev-r')}</a>` : ''}
+      ${prev ? `<a class="icon-btn" data-replace href="#chapter/${slugPath(prev)}" aria-label="Chapter sebelumnya">${ic('chev-l')}</a>` : ''}
+      ${next ? `<a class="icon-btn" data-replace href="#chapter/${slugPath(next)}" aria-label="Chapter berikutnya">${ic('chev-r')}</a>` : ''}
       <a class="icon-btn" href="${API}/download?slug=${encodeURIComponent(chapter.url || chapter.slug)}" aria-label="Unduh ZIP">${ic('download')}</a>
       <button class="icon-btn" data-act="theme" aria-label="Ganti tema">${ic('sun')}</button>
     </div>
@@ -519,6 +524,7 @@ async function renderChapter(route) {
   const onScroll = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; const h = document.documentElement.scrollHeight - innerHeight; bar.style.transform = `scaleX(${h > 0 ? Math.min(1, scrollY / h) : 0})`; }); };
   addEventListener('scroll', onScroll, { passive: true });
   cleanup = () => { io?.disconnect(); removeEventListener('scroll', onScroll); };
+  saveRecent(chapter, null);
   let detail = null;
   if (reader.detailSlug) { try { detail = await api(`/detail?slug=${encodeURIComponent(reader.detailSlug)}`); } catch {  } }
   if (detail) reader.detailSlug = detail.slug || reader.detailSlug;
@@ -687,6 +693,8 @@ function doSearch(q) {
 document.addEventListener('click', async e => {
   const imgErr = e.target.closest?.('img.image-error');
   if (imgErr) { imgErr.classList.remove('image-error'); const s = imgErr.src; imgErr.src = ''; imgErr.src = s; return; }
+  const rep = e.target.closest('a[data-replace]');
+  if (rep) { e.preventDefault(); location.replace(rep.getAttribute('href')); return; }
   if (e.target.closest('.scrim')) return closeOverlays();
   if (e.target === overlay) return closeOverlays();
   if (e.target.closest('a[href^="#"]')) { if (!drawer.hidden || !overlay.hidden) closeOverlays(); const a = e.target.closest('a[href^="#"]'); if (a.getAttribute('href') === location.hash && !a.dataset.act) renderRoute(true); }
@@ -707,10 +715,15 @@ document.addEventListener('click', async e => {
     case 'top': scrollTo({ top: 0, behavior: 'smooth' }); break;
     case 'syn': $('#syn').classList.toggle('open'); el.textContent = $('#syn').classList.contains('open') ? 'Lebih sedikit' : 'Selengkapnya'; break;
     case 'back': if (history.length > 1) { e.preventDefault(); history.back(); } break;
-    case 'reader-back': location.hash = reader.detailSlug ? `#detail/${slugPath(reader.detailSlug)}` : reader.mangaUrl ? '#home' : '#home'; break;
+    case 'reader-back': {
+      if (chapterFromDetail && history.length > 1) { history.back(); break; }
+      const target = reader.detailSlug ? `#detail/${slugPath(reader.detailSlug)}` : '#home';
+      location.replace(target);
+      break;
+    }
     case 'clear-searches': store.set(K.searches, []); openSearch(); break;
     case 'clear-recent': if (await confirmDialog('Hapus riwayat?', 'Semua riwayat bacaan akan dihapus dari perangkat ini.')) { store.set(K.recent, []); toast('Riwayat dihapus'); renderRoute(true); } break;
-    case 'del-recent': store.set(K.recent, getRecent().filter(r => comicKey(r) !== el.dataset.key)); renderRiwayat(); break;
+    case 'del-recent': { const all = getRecent(); const gone = all.find(r => comicKey(r) === el.dataset.key); store.set(K.recent, all.filter(r => comicKey(r) !== el.dataset.key && !(gone && r.title === gone.title))); renderRiwayat(); break; }
     case 'clear-bm': if (await confirmDialog('Hapus bookmark?', 'Semua komik yang kamu simpan akan dihapus.')) { store.set(K.bm, []); toast('Bookmark dihapus'); renderProfil(); } break;
     case 'clear-cache': memCache.clear(); store.get('komikmu:cidx', []).forEach(k => { try { localStorage.removeItem(k); } catch {} }); store.set('komikmu:cidx', []); toast('Cache dibersihkan'); break;
     case 'random': {
@@ -774,5 +787,8 @@ if (splash) {
 ['gesturestart', 'gesturechange'].forEach(ev => document.addEventListener(ev, e => e.preventDefault()));
 if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
 
+let freshLaunch = false;
+try { freshLaunch = !sessionStorage.getItem('komikmu:sess'); sessionStorage.setItem('komikmu:sess', '1'); } catch {}
+if (freshLaunch && /^#(chapter|detail)\//.test(location.hash)) location.replace('#home');
 if (!location.hash) location.hash = '#home';
 else renderRoute(true);

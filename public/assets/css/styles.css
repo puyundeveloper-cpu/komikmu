@@ -466,3 +466,6 @@ body.has-splash{overflow:hidden}
 .avatar-custom strong{font-size:12px;color:var(--muted)}
 .avatar-size-note{font-size:11px;color:var(--muted);line-height:1.5;margin:0}
 .avatar-modal{max-height:85vh;overflow:auto}
+
+.splash-foot .splash-dev{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.22);text-decoration:none}
+.splash-foot .splash-dev:hover{background:rgba(255,255,255,.14)}

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Komikmu
 
 Website baca komik responsif dengan backend scraper Node.js + Cheerio. Sumber data yang dikonfigurasi adalah `https://komiku.online`. Antarmuka mempunyai beranda, pencarian, terbaru, populer, filter manga/manhwa/manhua, genre, detail, reader vertikal, riwayat bacaan lokal, dan unduh chapter sebagai ZIP.
@@ -62,12 +61,3 @@ Folder ini menyertakan `vercel.json` dan entry point `api/index.js`. Import proj
 ## Tampilan (v2)
 
 Antarmuka memakai tema ungu gelap "Komik Mu" (mode terang tersedia di Profil). Halaman: Home, Jelajah (Semua/Manga/Manhwa/Manhua + urutan), Kategori & genre, Pencarian, Detail, Pembaca vertikal, Bookmark, Riwayat, Profil/Pengaturan, Cara Menggunakan, FAQ, Tentang. Bookmark, riwayat, nama, tema, dan pengaturan animasi disimpan di `localStorage`. Backend (`lib/`, `server.js`, `api/`) tidak diubah. Animasi hanya memakai `transform`/`opacity` dan bisa dimatikan di Profil → Animasi.
-=======
-# komikmu
->>>>>>> d3adcdf3bd610335146783e703d3d42afda5e6a3
-
----
-
-## Informasi dari README GitHub
-
-# komikmu
