@@ -1,0 +1,63 @@
+# Komikmu
+
+Website baca komik responsif dengan backend scraper Node.js + Cheerio. Sumber data yang dikonfigurasi adalah `https://komiku.online`. Antarmuka mempunyai beranda, pencarian, terbaru, populer, filter manga/manhwa/manhua, genre, detail, reader vertikal, riwayat bacaan lokal, dan unduh chapter sebagai ZIP.
+
+> **Catatan sumber dan hak cipta:** Komikmu adalah proyek pembaca pihak ketiga, bukan situs resmi Komiku. Hormati syarat penggunaan situs sumber, hak cipta pemilik karya, aturan wilayah, dan batasi frekuensi request. Scraper dapat berhenti bekerja bila situs sumber mengubah HTML, menerapkan pembatasan, atau tidak dapat diakses.
+
+## Jalankan di komputer, VPS, atau Termux
+
+Perlu Node.js 20 atau lebih baru.
+
+```bash
+npm install
+npm start
+```
+
+Buka `http://127.0.0.1:3000`. Untuk akses melalui perangkat lain di jaringan yang sama, gunakan IP lokal perangkat server dan port `3000`.
+
+### Termux
+
+```bash
+pkg update
+pkg install nodejs-lts
+mkdir -p ~/komikmu
+cd ~/komikmu
+# Letakkan/ekstrak semua file project ke folder ini
+npm install
+npm start
+```
+
+Agar berjalan di port lain: `PORT=8080 npm start`.
+
+## API
+
+- `GET /api/health`
+- `GET /api/home`
+- `GET /api/latest?page=1`
+- `GET /api/popular?page=1`
+- `GET /api/search?q=naruto&page=1`
+- `GET /api/type/manga?page=1` (manga, manhwa, manhua)
+- `GET /api/genre/aksi?page=1`
+- `GET /api/genres`
+- `GET /api/detail?slug=slug-komik`
+- `GET /api/chapter?slug=slug-chapter`
+- `GET /api/random?detail=false`
+- `GET /api/download?slug=slug-chapter` — unduh gambar chapter menjadi ZIP; dibatasi hingga 120 gambar dan 80 MB per ZIP.
+
+Slug untuk detail/chapter boleh diisi slug relatif yang dikembalikan API atau URL halaman sumber `komiku.online`. Backend menolak URL halaman yang host-nya bukan `komiku.online` dan mengamankan permintaan URL gambar untuk endpoint ZIP.
+
+## Deploy ke Vercel
+
+Folder ini menyertakan `vercel.json` dan entry point `api/index.js`. Import project/repository ini ke Vercel lalu deploy. Setelah deploy, cek `/api/health`. Scraping situs pihak ketiga bisa mendapat hasil berbeda pada serverless; jika permintaan sumber sering timeout/diblokir atau proses unduh ZIP terlalu besar, jalankan service pada VPS/Node.js yang sesuai.
+
+## Catatan implementasi
+
+- API menggunakan cache dengan strategi stale-while-revalidate: data cache dipaparkan segera, lalu dicuba dikemas kini di latar belakang. Jika sumber sementara gagal, data cache lama masih boleh digunakan dalam tempoh stale. Permintaan pertama bagi data yang belum pernah dicache tetap perlu menunggu sumber scraper.
+- Rate limit ringan dipasang pada API.
+- Sampul berasal dari URL gambar yang dikembalikan scraper; bila host gambar tidak mengizinkan hotlink, sebagian gambar mungkin tidak muncul.
+- Riwayat bacaan disimpan di `localStorage` browser, tidak memerlukan akun atau database.
+- Tidak ada kredensial atau API key yang diperlukan oleh proyek ini.
+
+## Tampilan (v2)
+
+Antarmuka memakai tema ungu gelap "Komik Mu" (mode terang tersedia di Profil). Halaman: Home, Jelajah (Semua/Manga/Manhwa/Manhua + urutan), Kategori & genre, Pencarian, Detail, Pembaca vertikal, Bookmark, Riwayat, Profil/Pengaturan, Cara Menggunakan, FAQ, Tentang. Bookmark, riwayat, nama, tema, dan pengaturan animasi disimpan di `localStorage`. Backend (`lib/`, `server.js`, `api/`) tidak diubah. Animasi hanya memakai `transform`/`opacity` dan bisa dimatikan di Profil → Animasi.
